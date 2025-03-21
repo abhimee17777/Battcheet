@@ -21,7 +21,9 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       authorization: {
         params: {
-          prompt: "select_account"
+          access_type: "offline",
+          prompt: "consent",
+          response_type: "code"
         }
       }
     }),
@@ -59,9 +61,10 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  debug: process.env.NODE_ENV === 'development',
+  debug: true,
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
@@ -84,7 +87,7 @@ export const authOptions: NextAuthOptions = {
 
           if (!existingUser) {
             // Create new user if doesn't exist
-            await prismadb.user.create({
+            const newUser = await prismadb.user.create({
               data: {
                 email: user.email,
                 name: user.name || user.email.split('@')[0],
@@ -92,7 +95,9 @@ export const authOptions: NextAuthOptions = {
                 emailVerified: new Date(),
               }
             });
+            return true;
           }
+          return true;
         }
         return true;
       } catch (error) {
@@ -100,27 +105,40 @@ export const authOptions: NextAuthOptions = {
         return false;
       }
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, profile, trigger }) {
+      // Initial sign in
       if (account && user) {
         return {
           ...token,
           id: user.id,
           email: user.email,
+          name: user.name,
+          picture: user.image,
         };
       }
+      // Return previous token if the session exists
       return token;
     },
     async session({ session, token }) {
       if (session?.user) {
         session.user.id = token.id as string;
         session.user.email = token.email as string;
+        session.user.name = token.name as string | null;
+        session.user.image = token.picture as string | null;
       }
       return session;
     },
     async redirect({ url, baseUrl }) {
+      // After successful sign in, redirect to conversations
+      if (url === '/login' || url === '/register' || url.startsWith('/api/auth')) {
+        return `${baseUrl}/conversations`;
+      }
+      // If on the same site
       if (url.startsWith(baseUrl)) return url;
+      // Handle relative paths
       if (url.startsWith("/")) return `${baseUrl}${url}`;
-      return baseUrl + "/conversations";
+      // Default redirect
+      return baseUrl;
     },
   },
 }; 
