@@ -1,12 +1,24 @@
 import React from 'react';
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { User } from "@prisma/client";
+import { User, Conversation, Message } from "@prisma/client";
 
-import { authOptions } from "../../libs/auth";
-import prismadb from "../../libs/prismadb";
-import ConversationList from "../../components/ConversationList";
-import EmptyState from "../../components/EmptyState";
+import { authOptions } from "../../../app/libs/auth";
+import prismadb from "../../../app/libs/prismadb";
+import ConversationList from "../../../app/components/ConversationList";
+import EmptyState from "../../../app/components/EmptyState";
+
+type FullMessageType = Message & {
+  user: User;
+  seenBy: User[];
+};
+
+type FullConversationType = Conversation & {
+  participants: {
+    user: User;
+  }[];
+  messages: FullMessageType[];
+};
 
 export default async function ConversationsPage() {
   const session = await getServerSession(authOptions);
@@ -15,13 +27,13 @@ export default async function ConversationsPage() {
     redirect("/login");
   }
 
-  const user = session.user as User;
+  const currentUser = session.user as User;
 
   const conversations = await prismadb.conversation.findMany({
     where: {
       participants: {
         some: {
-          userId: user.id,
+          userId: currentUser.id,
           leftAt: null,
         },
       },
@@ -35,7 +47,11 @@ export default async function ConversationsPage() {
       messages: {
         include: {
           user: true,
-          seenBy: true,
+          seenBy: {
+            include: {
+              user: true
+            }
+          }
         },
         orderBy: {
           createdAt: "desc",
@@ -46,7 +62,7 @@ export default async function ConversationsPage() {
     orderBy: {
       lastMessageAt: "desc",
     },
-  });
+  }) as unknown as FullConversationType[];
 
   return (
     <div className="h-full">
