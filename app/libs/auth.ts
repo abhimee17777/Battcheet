@@ -1,21 +1,27 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import { NextAuthOptions, User } from "next-auth";
+import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import prismadb from "./prismadb";
 
+if (!process.env.GOOGLE_CLIENT_ID) {
+  throw new Error('Missing GOOGLE_CLIENT_ID');
+}
+
+if (!process.env.GOOGLE_CLIENT_SECRET) {
+  throw new Error('Missing GOOGLE_CLIENT_SECRET');
+}
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prismadb),
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       authorization: {
         params: {
-          prompt: "consent",
-          access_type: "offline",
-          response_type: "code",
+          prompt: "select_account"
         }
       }
     }),
@@ -53,10 +59,9 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  debug: true,
+  debug: process.env.NODE_ENV === 'development',
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
@@ -67,7 +72,10 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account, profile }) {
       try {
         if (account?.provider === "google") {
-          if (!user.email) return false;
+          if (!user.email) {
+            console.error('No email provided by Google');
+            return false;
+          }
           
           // Check if user exists
           const existingUser = await prismadb.user.findUnique({
@@ -79,7 +87,7 @@ export const authOptions: NextAuthOptions = {
             await prismadb.user.create({
               data: {
                 email: user.email,
-                name: user.name,
+                name: user.name || user.email.split('@')[0],
                 image: user.image,
                 emailVerified: new Date(),
               }
@@ -110,16 +118,9 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async redirect({ url, baseUrl }) {
-      console.log('Redirect callback:', { url, baseUrl });
-      
-      // Always redirect to /conversations after successful sign in
-      if (url.includes('/api/auth/signin') || url.includes('/login')) {
-        return `${baseUrl}/conversations`;
-      }
-      
       if (url.startsWith(baseUrl)) return url;
       if (url.startsWith("/")) return `${baseUrl}${url}`;
-      return baseUrl;
+      return baseUrl + "/conversations";
     },
   },
 }; 
