@@ -10,6 +10,26 @@ export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsLoading(true);
+      const result = await signIn('google', {
+        redirect: false,
+        callbackUrl: '/conversations'
+      });
+
+      if (result?.error) {
+        toast.error(result.error);
+      } else if (result?.ok) {
+        router.push('/conversations');
+      }
+    } catch (error) {
+      toast.error('Something went wrong with Google sign-in');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
@@ -23,13 +43,13 @@ export default function LoginPage() {
         email,
         password,
         redirect: false,
+        callbackUrl: '/conversations'
       });
 
       if (result?.error) {
         toast.error('Invalid credentials');
-      } else {
+      } else if (result?.ok) {
         router.push('/conversations');
-        router.refresh();
       }
     } catch (error) {
       toast.error('Something went wrong');
@@ -120,7 +140,8 @@ export default function LoginPage() {
             <div className="mt-6 flex flex-col gap-4">
               <button
                 type="button"
-                onClick={() => signIn('google')}
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
                 className="flex w-full justify-center gap-3 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus-visible:outline-offset-0"
               >
                 <Image
@@ -130,7 +151,7 @@ export default function LoginPage() {
                   width={20}
                   height={20}
                 />
-                Google
+                {isLoading ? 'Signing in...' : 'Continue with Google'}
               </button>
 
               <button
