@@ -3,10 +3,10 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { User, Conversation, Message } from "@prisma/client";
 
-import { authOptions } from "../../../app/libs/auth";
-import prismadb from "../../../app/libs/prismadb";
-import ConversationList from "../../../app/components/ConversationList";
-import EmptyState from "../../../app/components/EmptyState";
+import { authOptions } from "../../libs/auth";
+import prismadb from "../../libs/prismadb";
+import ConversationList from "../../components/ConversationList";
+import EmptyState from "../../components/EmptyState";
 
 type FullMessageType = Message & {
   user: User;
@@ -24,10 +24,18 @@ export default async function ConversationsPage() {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.email) {
-    redirect("/login");
+    return redirect("/login");
   }
 
-  const currentUser = session.user as User;
+  const currentUser = await prismadb.user.findUnique({
+    where: {
+      email: session.user.email
+    }
+  });
+
+  if (!currentUser) {
+    return redirect("/login");
+  }
 
   const conversations = await prismadb.conversation.findMany({
     where: {
