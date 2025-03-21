@@ -11,16 +11,11 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-      profile(profile) {
-        const now = new Date();
-        return {
-          id: profile.sub,
-          name: profile.name,
-          email: profile.email,
-          image: profile.picture,
-          emailVerified: now,
-          createdAt: now,
-          updatedAt: now,
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code",
         }
       }
     }),
@@ -58,7 +53,7 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  debug: process.env.NODE_ENV === 'development',
+  debug: true, // Enable debug messages
   session: {
     strategy: "jwt",
   },
@@ -87,6 +82,9 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async redirect({ url, baseUrl }) {
+      // For debugging
+      console.log('Redirect callback:', { url, baseUrl });
+      
       if (url.startsWith(baseUrl)) return url;
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       return baseUrl;
