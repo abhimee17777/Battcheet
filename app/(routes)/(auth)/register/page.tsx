@@ -32,15 +32,16 @@ export default function RegisterPage() {
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Something went wrong');
+        throw new Error(data.error || 'Something went wrong');
       }
 
       toast.success('Account created successfully!');
       router.push('/login');
     } catch (error: any) {
-      toast.error(error.message || 'Something went wrong');
+      toast.error(error.message);
     } finally {
       setIsLoading(false);
     }

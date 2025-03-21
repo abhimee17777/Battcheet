@@ -8,7 +8,10 @@ export async function POST(request: Request) {
     const { email, name, password } = body;
 
     if (!email || !name || !password) {
-      return new NextResponse('Missing fields', { status: 400 });
+      return NextResponse.json(
+        { error: 'Missing fields' },
+        { status: 400 }
+      );
     }
 
     const existingUser = await prismadb.user.findUnique({
@@ -18,7 +21,10 @@ export async function POST(request: Request) {
     });
 
     if (existingUser) {
-      return new NextResponse('Email already exists', { status: 400 });
+      return NextResponse.json(
+        { error: 'Email already exists' },
+        { status: 400 }
+      );
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -34,6 +40,9 @@ export async function POST(request: Request) {
     return NextResponse.json(user);
   } catch (error: any) {
     console.log(error, 'REGISTRATION_ERROR');
-    return new NextResponse('Internal Error', { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal Error' },
+      { status: 500 }
+    );
   }
 } 
