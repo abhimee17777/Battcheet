@@ -53,37 +53,69 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  debug: true, // Enable debug messages
+  debug: true,
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: "/login",
-    error: '/login', // Error code passed in query string as ?error=
+    error: '/login',
   },
   callbacks: {
     async signIn({ user, account, profile }) {
-      if (account?.provider === "google") {
-        return !!(user.email && user.name);
+      try {
+        if (account?.provider === "google") {
+          if (!user.email) return false;
+          
+          // Check if user exists
+          const existingUser = await prismadb.user.findUnique({
+            where: { email: user.email }
+          });
+
+          if (!existingUser) {
+            // Create new user if doesn't exist
+            await prismadb.user.create({
+              data: {
+                email: user.email,
+                name: user.name,
+                image: user.image,
+                emailVerified: new Date(),
+              }
+            });
+          }
+        }
+        return true;
+      } catch (error) {
+        console.error('SignIn error:', error);
+        return false;
       }
-      return true;
     },
     async jwt({ token, user, account }) {
-      if (user) {
-        token.id = user.id;
+      if (account && user) {
+        return {
+          ...token,
+          id: user.id,
+          email: user.email,
+        };
       }
       return token;
     },
     async session({ session, token }) {
       if (session?.user) {
         session.user.id = token.id as string;
+        session.user.email = token.email as string;
       }
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // For debugging
       console.log('Redirect callback:', { url, baseUrl });
+      
+      // Always redirect to /conversations after successful sign in
+      if (url.includes('/api/auth/signin') || url.includes('/login')) {
+        return `${baseUrl}/conversations`;
+      }
       
       if (url.startsWith(baseUrl)) return url;
       if (url.startsWith("/")) return `${baseUrl}${url}`;
